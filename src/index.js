@@ -14,10 +14,13 @@ const elements = {
     gallery: document.querySelector('.gallery'),
     guard: document.querySelector('.js-guard')
 }
+let photoCard = new SimpleLightbox('.photo-card a', {
+    captionDelay :'250'
+});
 const options = {
     rootMargin: '50px'
 }
-const observer = new IntersectionObserver(handlerNoadMore, options);
+const observer = new IntersectionObserver(handlerLoadMore, options);
 let page = 1;
 let value = "";
 function createMarkup(response) {
@@ -56,53 +59,53 @@ function handlerSearch(evt) {
     const { searchQuery } = evt.currentTarget.elements;
     elements.gallery.innerHTML = '';
     value = searchQuery.value;
-    if (value !== "") {
-          serviceItems(value, page);
+    if (value.trim() !== "") {
+        page = 1;
+        observer.unobserve(elements.guard);
+        serviceItems(value, page);
         elements.form.reset();
     } else {
         iziToast.error({
-            message: `Sorry, there are no images matching your search query. Please try again.`,
+            message: `You need to fill thecorrect search.`,
           });
      }
    
 }
-async function serviceItems(value, page) {
-    try {
-        const response = await axios.get(`https://pixabay.com/api/?key=42309515-7c9611a24bfcb09e365820ed6&q=${value}&image_type=photo&orientation=horizontal&=true&per_page=40&page=${page}`)
-        if (response.data.hits.length === 0) {
-            iziToast.error({
-                message: `Sorry, there are no images matching your search query. Please try again.`,
-              });
-        } else {
-            createMarkup(response);
-            let photoCard = new SimpleLightbox('.photo-card a', {
-                captionDelay :'250'
-            });
-        }
-        if (page <= response.data.total / 40 && page < 500) {
-            observer.observe(elements.guard)
-        } else {
-            observer.unobserve(elements.guard);
-        }
+async function getResponse(value, page){
+    try{
+        return await axios.get(`https://pixabay.com/api/?key=42309515-7c9611a24bfcb09e365820ed6&q=${value}&image_type=photo&orientation=horizontal&=true&per_page=40&page=${page}`);
     }
     catch(error) {
         iziToast.error({
             message: `Sorry, there are no images matching your search query. Please try again.`,
-          });
+        });
     }
 }
-function handlerNoadMore(entries) {
+async function serviceItems(value, page) {
+    const response = await getResponse(value, page);
+
+    if (response.data.hits.length === 0) {
+        iziToast.error({
+            message: `Sorry, there are no images matching your search query. Please try again.`,
+        });
+    } else {
+        createMarkup(response);
+        photoCard.refresh();
+        if (page <= response.data.total / 40 && page < 500) {
+            observer.observe(elements.guard)
+        } else {
+            observer.unobserve(elements.guard);
+            iziToast.info({
+                message: `We're sorry, but you've reached the end of search results.`,
+                });
+        }
+    }
+}
+function handlerLoadMore(entries) {
     entries.forEach(entry => {
         if (entry.isIntersecting) {
             page += 1;
             serviceItems(value, page);
-             const { height: cardHeight } = document
-            .querySelector(".gallery")
-            .firstElementChild.getBoundingClientRect();
-            window.scrollBy({
-                top: cardHeight * 2,
-                behavior: "smooth",
-            });
         }
     })
 }
